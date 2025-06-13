@@ -1,0 +1,70 @@
+name: Android Build lxcfs-dev
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_arch:
+        description: 'Target architecture (aarch64/arm/x86_64/i686)'
+        required: false
+        default: 'aarch64'
+      ndk_version:
+        description: 'Android NDK version'
+        required: false
+        default: 'r27c'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Android NDK
+      uses: nttld/setup-ndk@v1
+      with:
+        ndk-version: ${{ github.event.inputs.ndk_version || 'r27c' }}
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get install -y -qq build-essential pipx python3-venv pkg-config \
+        cmake docbook2x python3-pip pipx help2man
+        
+        pipx ensurepath
+        pipx install meson==0.61
+        pipx install ninja
+
+    - name: Download dependencies
+      run: |
+        libfuse_link=$(curl -s https://api.github.com/repos/DreamConnected/libfuse-dev/releases/latest | grep browser_download_url | cut -d'"' -f4 |grep -E 'zip$')
+        libfuse_name=$(curl -s https://api.github.com/repos/DreamConnected/libfuse-dev/releases/latest | grep name | cut -d'"' -f4 |grep -E 'zip$')
+        wget ${libfuse_link}
+        sudo unzip ${libfuse_name} -d /
+
+    - name: Build lxcfs-dev
+      run: |
+        sed -i "s|android-ndk-r27c|$ANDROID_NDK_HOME|g" aarch64-android-api30.txt
+        export PKG_CONFIG_PATH=/data/sysroot/lib/pkgconfig:$PKG_CONFIG_PATH
+        
+        meson setup build -Dinit-script=sysvinit -Dprefix=/data/share -Druntime-path=/cache --localstatedir=/data/share/var --cross-file aarch64-android-api30.txt
+        meson compile -C build
+        sudo ninja -C build install
+        echo "RELEASE_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4.3.1
+      with:
+        name: android-${{ github.event.inputs.target_arch || 'aarch64' }}-lxcfs-dev
+        path: /data/share/*
+
+    - name: Create a ZIP file for artifact
+      run: zip -r android-${{ github.event.inputs.target_arch || 'aarch64' }}-lxcfs-dev.zip /data/share/*
+    
+    - name: Create Release and Upload Release Asset
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ env.RELEASE_DATE }}
+        name: Release ${{ env.RELEASE_DATE }}
+        body: TODO New Release.
+        draft: false
+        prerelease: false
+        files: |
+            android-${{ github.event.inputs.target_arch || 'aarch64' }}-lxcfs-dev.zip
