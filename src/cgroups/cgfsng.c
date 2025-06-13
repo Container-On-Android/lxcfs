@@ -719,6 +719,11 @@ static char *readat_cpuset(int cgroup_fd)
 		return move_ptr(val);
 
 	free_disarm(val);
+	val = readat_file(cgroup_fd, "cpus");
+	if (val && strcmp(val, "") != 0)
+		return move_ptr(val);
+
+	free_disarm(val);
 	val = readat_file(cgroup_fd, "cpuset.cpus.effective");
 	if (val && strcmp(val, "") != 0)
 		return move_ptr(val);
@@ -1066,6 +1071,11 @@ static int cg_unified_init(struct cgroup_ops *ops)
 static int cg_init(struct cgroup_ops *ops)
 {
 	int ret;
+	char *cg_mode;
+
+	cg_mode = getenv("LXCFS_CGROUP_MODE");
+	if (cg_mode && (strcmp(cg_mode, "legacy") == 0 || strcmp(cg_mode, "hybrid") == 0))
+		return cg_hybrid_init(ops);
 
 	ret = cg_unified_init(ops);
 	if (ret < 0)

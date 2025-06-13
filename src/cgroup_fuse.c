@@ -96,7 +96,7 @@ static char *pick_controller_from_path(struct fuse_context *fc, const char *path
 		return NULL;
 	}
 	p1 = path + 8;
-	contr = strdupa(p1);
+	contr = strdup(p1);
 	if (!contr) {
 		errno = ENOMEM;
 		return NULL;

@@ -5,7 +5,9 @@
 
 #include "config.h"
 
-#if HAVE_FUSE3
+#if __ANDROID__
+#include <fuse.h>
+#elif HAVE_FUSE3
 #include <fuse3/fuse.h>
 #else
 #include <fuse.h>
